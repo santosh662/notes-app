@@ -1,98 +1,89 @@
 pipeline {
-    agent { label "dev" }
+
+    agent any
 
     environment {
-        DOCKER_CREDS   = credentials('Docker_Hub_Id_Pwd')
-        IMAGE_NAME     = "notes-app"
-        IMAGE_TAG      = "v1.${BUILD_NUMBER}"
+
+        IMAGE_NAME = "notes-app:latest"
         CONTAINER_NAME = "notes-app-container"
-        PORT           = "9092"
-        HOST_IP        = "15.206.27.95"
+        PORT = "9092"
+
     }
 
     stages {
-        stage('Checkout Code') {
+
+        stage('Checkout') {
+
             steps {
-                git branch: 'master', url: 'https://github.com/Satyams-git/notes-app.git'
+
+                git branch: 'master', url: 'https://github.com/santosh662/notes-app.git'
+
             }
         }
 
         stage('Build Docker Image') {
+
             steps {
-                sh '''
-                    echo "===== Building Docker Image ====="
-                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
-                '''
-            }
-        }
 
-        stage('Tag & Push Image') {
-            steps {
-                sh '''
-                    echo "===== Logging in to Docker Hub ====="
-                    echo "$DOCKER_CREDS_PSW" | docker login -u "$DOCKER_CREDS_USR" --password-stdin
+                echo "======= Building Docker Image ========"
 
-                    echo "===== Tagging Image ====="
-                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_CREDS_USR}/${IMAGE_NAME}:${IMAGE_TAG}
+                sh 'docker build -t $IMAGE_NAME .'
 
-                    echo "===== Pushing Image ====="
-                    docker push ${DOCKER_CREDS_USR}/${IMAGE_NAME}:${IMAGE_TAG}
-                '''
             }
         }
 
         stage('Stop Old Container') {
+
             steps {
-                sh '''
-                    echo "===== Stopping Old Container ====="
-                    docker stop ${CONTAINER_NAME} || true
-                    docker rm ${CONTAINER_NAME} || true
-                '''
+
+                echo "======= Stopping Old Container ========"
+
+                sh 'docker stop $CONTAINER_NAME || true'
+
+                sh 'docker rm $CONTAINER_NAME || true'
+
             }
         }
 
-        stage('Run New Container') {
+        stage('Run Container') {
+
             steps {
-                sh '''
-                    echo "===== Running New Container ====="
-                    docker run -d --name ${CONTAINER_NAME} -p ${PORT}:80 -v notes-data:/data ${DOCKER_CREDS_USR}/${IMAGE_NAME}:${IMAGE_TAG}
-                '''
+
+                echo "======= Running New Container ========"
+
+                sh 'docker run -d --name $CONTAINER_NAME -p $PORT:80 $IMAGE_NAME'
+
             }
         }
 
-        stage('Verify Deployment') {
+        stage('Verify') {
+
             steps {
-                sh '''
-                    echo "===== Verifying App ====="
-                    sleep 10
-                    curl -f http://${HOST_IP}:${PORT}
-                '''
+
+                echo "======= Checking App Response ========"
+
+                sh 'sleep 5'
+
+                sh 'curl -I http://3.110.77.220:$PORT'
+
             }
         }
     }
 
     post {
+
         success {
-            echo "===== Deployment Successful: http://${HOST_IP}:${PORT} ====="
-            emailext(
-                subject: "Build Successful",
-                body: "Build was Successful - Congrats!",
-                to: "satyam.du.in@gmail.com"
-            )
+
+            echo "Notes app deployed successfully"
+
+            echo "Application URL: http://3.110.77.220:$PORT"
+
         }
+
         failure {
-            echo "===== Deployment Failed! Check logs ====="
-            emailext(
-                subject: "Build Failed",
-                body: "Oops! Build Failed",
-                to: "satyam.du.in@gmail.com"
-            )
-        }
-        always {
-            sh '''
-                echo "===== Cleaning Unused Images ====="
-                docker image prune -f
-            '''
+
+            echo "Notes app deployment failed. Check logs."
+
         }
     }
 }
